@@ -1,0 +1,82 @@
+Poniższy kod wykonuje się bez błędów, poprawnie tworzy bazę danych, ale nie zaczytuje danych. Nie rozumiem dlaczego.
+Czy możemy to omówić w poniedziałek?
+
+""" Skorzystaj z danych clean_stations.csv oraz clean_measure.csv. 
+Na podstawie tych zbiorów stwórz bazę danych i tabelę, 
+do której będzie można się odwoływać, na przykład poprzez wywołanie:
+conn.execute("SELECT * FROM stations LIMIT 5").fetchall()"""
+# Wykorzystam kod ze strony https://stackoverflow.com/questions/31394998/using-sqlalchemy-to-load-csv-file-into-a-database
+# https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_csv.html
+from numpy import genfromtxt
+from time import time
+from datetime import datetime
+from sqlalchemy import Column, Integer, Float, Date, Text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+def Load_Data(file_name):
+    data = genfromtxt(file_name, delimiter=',', skip_header=1, converters={0: lambda s: str(s)})
+    return data.tolist()
+
+Base = declarative_base()
+
+class Clean_Stations(Base):
+    #Tell SQLAlchemy what the table name is and if there's any table-specific arguments it should know about
+    __tablename__ = 'Clean_Stations'
+    __table_args__ = {'sqlite_autoincrement': True}
+    #tell SQLAlchemy the name of column and its attributes:
+    station = Column(Integer, primary_key=True, nullable=False) 
+    latitude = Column(Float)
+    longitude = Column(Float)
+    elevation = Column(Float)
+    name = Column(Text)
+    country = Column(Text)
+    state = Column(Text)
+
+class Clean_Measures(Base):
+    #Tell SQLAlchemy what the table name is and if there's any table-specific arguments it should know about
+    __tablename__ = 'Clean_Measures'
+    __table_args__ = {'sqlite_autoincrement': True}
+    #tell SQLAlchemy the name of column and its attributes:
+    station = Column(Integer, primary_key=True, nullable=False) 
+    date = Column(Date)
+    precip = Column(Float)
+    tobs = Column(Float)
+
+if __name__ == "__main__":
+    
+    import os
+    print(os.getcwd())
+   
+    #Create the database
+    engine = create_engine('sqlite:///stations.db')
+    Base.metadata.create_all(engine)
+
+    #Create the session
+    session = sessionmaker()
+    session.configure(bind=engine)
+    s = session()
+
+    try:
+        data = Load_Data("clean_stations.csv" ) 
+
+        for i in data:
+            record = Clean_Stations(**{
+                'station' : i[0],
+                'latitude' : i[1],
+                'longitude' : i[2],
+                'elevation' : i[3],
+                'name' : i[4],
+                'country' : i[5],
+                'state': i[6]
+            })
+            s.add(record) #Add all the records
+
+        s.commit() #Attempt to commit all the records
+    except:
+        s.rollback() #Rollback the changes on error
+    finally:
+        s.close() #Close the connection
+
+
